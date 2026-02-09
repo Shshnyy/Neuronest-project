@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useContext, useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,22 +6,70 @@ import {
   TouchableOpacity,
   useColorScheme,
   StyleSheet,
+  RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-
-const isDark = false;
-
-const historyData = [
-  { mood: "Calm", time: "10:30 AM" },
-  { mood: "Stressed", time: "9:15 AM" },
-  { mood: "Meltdown", time: "8:00 AM" },
-  { mood: "Stressed", time: "7:45 AM" },
-  { mood: "Calm", time: "7:00 AM" },
-];
+import { WearableContext, MIND_STATES } from "../context/WearableContext";
 
 export default function HistoryScreen({ navigation }) {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
+
+  const { getTodayHistory, getStateInfo, predictionHistory } = useContext(WearableContext);
+
+  const [historyData, setHistoryData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const data = await getTodayHistory();
+      // Sort by timestamp descending (newest first)
+      const sortedData = data.sort((a, b) => 
+        new Date(b.timestamp) - new Date(a.timestamp)
+      );
+      setHistoryData(sortedData);
+    } catch (error) {
+      console.error("Error loading history:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getTodayHistory]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory, predictionHistory]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadHistory();
+    setRefreshing(false);
+  }, [loadHistory]);
+
+  const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  const getIconForState = (state) => {
+    switch (state) {
+      case MIND_STATES.CALM:
+        return { name: "self-improvement", color: "#22c55e" };
+      case MIND_STATES.STRESSED:
+        return { name: "warning", color: "#f59e0b" };
+      case MIND_STATES.MELTDOWN:
+        return { name: "error", color: "#ef4444" };
+      case MIND_STATES.AMUSEMENT:
+        return { name: "sentiment-satisfied", color: "#3b82f6" };
+      default:
+        return { name: "help", color: "#6b7280" };
+    }
+  };
 
   return (
     <View
@@ -30,7 +78,12 @@ export default function HistoryScreen({ navigation }) {
         { backgroundColor: isDark ? "#101c22" : "#f6f7f8" },
       ]}
     >
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+      <ScrollView 
+        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -55,7 +108,6 @@ export default function HistoryScreen({ navigation }) {
             name="refresh"
             size={20}
             color={isDark ? "#a0b3bd" : "#617c89"}
-            style={{ transform: [{ rotate: "0deg" }] }}
           />
           <Text
             style={[styles.pullText, { color: isDark ? "#a0b3bd" : "#617c89" }]}
@@ -70,41 +122,71 @@ export default function HistoryScreen({ navigation }) {
         >
           Today
         </Text>
-        {historyData.map((item, index) => (
-          <View
-            key={index}
-            style={[
-              styles.historyItem,
-              { backgroundColor: isDark ? "#1c1c1c" : "#fff" },
-            ]}
-          >
-            <View style={[styles.iconCircle, { backgroundColor: "#13a4ec20" }]}>
-              <MaterialIcons
-                name="self-improvement"
-                size={28}
-                color="#13a4ec"
-              />
-            </View>
-            <View style={styles.historyContent}>
-              <Text
-                style={[
-                  styles.historyMood,
-                  { color: isDark ? "#fff" : "#111" },
-                ]}
-              >
-                {item.mood}
-              </Text>
-              <Text
-                style={[
-                  styles.historyTime,
-                  { color: isDark ? "#a0b3bd" : "#617c89" },
-                ]}
-              >
-                {item.time}
-              </Text>
-            </View>
+
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#13a4ec" />
+            <Text style={[styles.loadingText, { color: isDark ? "#a0b3bd" : "#617c89" }]}>
+              Loading history...
+            </Text>
           </View>
-        ))}
+        ) : historyData.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <MaterialIcons name="history" size={48} color={isDark ? "#a0b3bd" : "#617c89"} />
+            <Text style={[styles.emptyText, { color: isDark ? "#a0b3bd" : "#617c89" }]}>
+              No history data yet
+            </Text>
+            <Text style={[styles.emptySubtext, { color: isDark ? "#a0b3bd" : "#617c89" }]}>
+              Connect your wearable to start tracking
+            </Text>
+          </View>
+        ) : (
+          historyData.map((item, index) => {
+            const iconInfo = getIconForState(item.state);
+            return (
+              <View
+                key={item.id || index}
+                style={[
+                  styles.historyItem,
+                  { backgroundColor: isDark ? "#1c1c1c" : "#fff" },
+                ]}
+              >
+                <View style={[styles.iconCircle, { backgroundColor: `${iconInfo.color}20` }]}>
+                  <MaterialIcons
+                    name={iconInfo.name}
+                    size={28}
+                    color={iconInfo.color}
+                  />
+                </View>
+                <View style={styles.historyContent}>
+                  <Text
+                    style={[
+                      styles.historyMood,
+                      { color: isDark ? "#fff" : "#111" },
+                    ]}
+                  >
+                    {item.state}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.historyTime,
+                      { color: isDark ? "#a0b3bd" : "#617c89" },
+                    ]}
+                  >
+                    {formatTime(item.timestamp)}
+                  </Text>
+                </View>
+                {item.confidence && (
+                  <View style={styles.confidenceBadge}>
+                    <Text style={styles.confidenceText}>
+                      {Math.round(item.confidence * 100)}%
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })
+        )}
       </ScrollView>
 
       {/* Footer Buttons */}
@@ -169,6 +251,17 @@ const styles = StyleSheet.create({
   historyContent: { flex: 1 },
   historyMood: { fontWeight: "bold", fontSize: 14 },
   historyTime: { fontSize: 12 },
+  confidenceBadge: {
+    backgroundColor: "#13a4ec20",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  confidenceText: {
+    fontSize: 11,
+    color: "#13a4ec",
+    fontWeight: "600",
+  },
   footer: { padding: 12, borderTopWidth: 1 },
   weeklyButton: {
     paddingVertical: 12,
@@ -177,10 +270,25 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     alignItems: "center",
   },
-  bottomNav: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 8,
+  loadingContainer: {
+    alignItems: "center",
+    padding: 32,
   },
-  navItem: { alignItems: "center" },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+  },
+  emptyContainer: {
+    alignItems: "center",
+    padding: 32,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 12,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    marginTop: 4,
+  },
 });

@@ -1,16 +1,19 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as tf from '@tensorflow/tfjs';
+import '@tensorflow/tfjs-react-native';
 
 import { AuthProvider, AuthContext } from "./AuthContext";
+import { WearableProvider } from "./src/context/WearableContext";
 
 // Screens
 import LoginScreen from "./src/screens/LoginScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import HistoryScreen from "./src/screens/HistoryScreen";
-import DeviceInfo from "./src/screens/DeviceInfo";
+import DeviceInfo from "./src/screens/DeviceInfoScreen";
 import Settings from "./src/screens/Settings";
 import ReliefScreen from "./src/screens/ReliefScreen";
 import AppInfoScreen from "./src/screens/AppInfoScreen"; // ✅ Stack only
@@ -77,11 +80,26 @@ function RootNavigator() {
 
 /* ---------- App Entry ---------- */
 export default function App() {
+  useEffect(() => {
+    // Initialize TensorFlow.js on app start
+    const initTF = async () => {
+      try {
+        await tf.ready();
+        console.log('TensorFlow.js ready in App.js');
+      } catch (error) {
+        console.error('TensorFlow.js initialization error:', error);
+      }
+    };
+    initTF();
+  }, []);
+
   return (
     <AuthProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
+      <WearableProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </WearableProvider>
     </AuthProvider>
   );
 }
