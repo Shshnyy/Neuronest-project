@@ -27,9 +27,11 @@
  * - Meltdown: High stress with specific patterns
  */
 
-// Uncomment for TensorFlow.js support:
-import * as tf from '@tensorflow/tfjs';
-import { bundleResourceIO } from '@tensorflow/tfjs-react-native';
+// TensorFlow.js is disabled - using rule-based predictions only
+// To re-enable TF.js in the future, uncomment the dynamic imports in initialize()
+let tf = null;
+let bundleResourceIO = null;
+
 import ConfigManager from '../utils/ConfigManager';
 
 // Mind state labels
@@ -105,31 +107,24 @@ class MLModelService {
 
   /**
    * Initialize the service
-   * For TensorFlow.js, this would initialize tf.ready()
+   * TensorFlow.js is disabled - always uses rule-based predictions
    */
   async initialize() {
     try {
-      // TensorFlow.js initialization
-      await tf.ready();
-      console.log('TensorFlow.js initialized');
-      console.log('Backend:', tf.getBackend());
-      this.useTensorFlow = true;
-
-      return { success: true, backend: tf.getBackend() };
+      // TF.js disabled - use rule-based system directly
+      console.log('ML Service initialized (rule-based mode)');
+      this.useTensorFlow = false;
+      return { success: true, usingFallback: true };
     } catch (error) {
-      console.error('Initialization error:', error);
-      return { success: false, error: error.message };
+      console.warn('ML Service initialization error:', error.message);
+      this.useTensorFlow = false;
+      return { success: false, error: error.message, usingFallback: true };
     }
   }
 
   /**
-   * Load the trained model
-   * Currently uses rule-based fallback
-   * 
-   * To use TensorFlow.js model:
-   * 1. Export your model from Colab in TF.js format
-   * 2. Copy model.json and weights.bin to assets/model/
-   * 3. Uncomment the TF.js loading code below
+   * Load the prediction system
+   * TensorFlow.js model loading is disabled - uses rule-based fallback
    */
   async loadModel() {
     try {
@@ -138,39 +133,14 @@ class MLModelService {
         return { success: true };
       }
 
-      // Uncomment for TensorFlow.js model loading:
-
-      if (this.useTensorFlow) {
-        console.log('Loading TensorFlow.js model...');
-        
-        try {
-          // For React Native, use bundleResourceIO with require
-          const modelJSON = require('../../assets/model/model.json');
-          const modelWeights = require('../../assets/model/weights.bin');
-          
-          this.model = await tf.loadLayersModel(
-            bundleResourceIO(modelJSON, modelWeights)
-          );
-          
-          this.isModelLoaded = true;
-          console.log('ML model loaded successfully');
-          console.log('Model input shape:', this.model.inputs[0].shape);
-          console.log('Model output shape:', this.model.outputs[0].shape);
-          return { success: true };
-        } catch (modelError) {
-          console.warn('Failed to load TensorFlow model, using rule-based fallback:', modelError.message);
-          // Fall through to rule-based system
-        }
-      }
-
-      // Using rule-based system
+      // Using rule-based system (TF.js disabled)
       console.log('Using rule-based prediction system');
-      this.isModelLoaded = true; // Mark as ready for rule-based
+      this.isModelLoaded = true;
       
       return { 
         success: true, 
         usingFallback: true,
-        message: 'Using rule-based predictions (TF.js not available)'
+        message: 'Using rule-based predictions'
       };
     } catch (error) {
       console.error('Model loading error:', error);

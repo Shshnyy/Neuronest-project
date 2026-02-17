@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
 
-export default function BreathingGame() {
+export default function BreathingGame({ navigation }) {
   const scale = useRef(new Animated.Value(1)).current;
   const [phase, setPhase] = useState('Inhale');
 

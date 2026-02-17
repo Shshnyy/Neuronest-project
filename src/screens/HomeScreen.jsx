@@ -116,8 +116,7 @@ export default function HomeScreen({ navigation }) {
             Dashboard
           </Text>
           {/* Connection Status Indicator */}
-          <TouchableOpacity
-            onPress={() => navigation.navigate("DeviceInfo")}
+          <View
             style={styles.connectionIndicator}
           >
             <View
@@ -129,7 +128,7 @@ export default function HomeScreen({ navigation }) {
             <Text style={{ color: connectionColor, fontSize: 12 }}>
               {isConnected ? "Connected" : "Disconnected"}
             </Text>
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* Current State Card */}
@@ -175,7 +174,7 @@ export default function HomeScreen({ navigation }) {
           {!isConnected && (
             <TouchableOpacity
               style={styles.connectButton}
-              onPress={() => navigation.navigate("DeviceInfo")}
+              onPress={() => navigation.navigate("DeviceConnection")}
             >
               <Text style={styles.connectButtonText}>Connect Device</Text>
             </TouchableOpacity>
@@ -320,7 +319,7 @@ export default function HomeScreen({ navigation }) {
             marginTop: 8,
           }}
         >
-          {/* Temperature Card */}
+          {/* WiFi Status Card */}
           <View
             style={[
               styles.card,
@@ -330,8 +329,8 @@ export default function HomeScreen({ navigation }) {
               },
             ]}
           >
-            <View style={[styles.iconCircle, { backgroundColor: "#f59e0b20" }]}>
-              <MaterialIcons name="thermostat" size={24} color="#f59e0b" />
+            <View style={[styles.iconCircle, { backgroundColor: isConnected ? "#22c55e20" : "#ef444420" }]}>
+              <MaterialIcons name="wifi" size={24} color={isConnected ? "#22c55e" : "#ef4444"} />
             </View>
             <View>
               <Text
@@ -340,7 +339,7 @@ export default function HomeScreen({ navigation }) {
                   { color: isDark ? "#a0b3bd" : "#617c89" },
                 ]}
               >
-                Temperature
+                WiFi Status
               </Text>
               <Text
                 style={[
@@ -348,21 +347,15 @@ export default function HomeScreen({ navigation }) {
                   { color: isDark ? "#fff" : "#111" },
                 ]}
               >
-                {sensorData.temperature
-                  ? `${sensorData.temperature.toFixed(1)}°C`
-                  : "--"}
+                {isConnected ? "Online" : "Offline"}
               </Text>
               <Text
                 style={[
                   styles.cardLabel,
-                  { color: isDark ? "#a0b3bd" : "#617c89" },
+                  { color: isConnected ? "#22c55e" : "#ef4444" },
                 ]}
               >
-                {sensorData.temperature
-                  ? sensorData.temperature > 37.2
-                    ? "Elevated"
-                    : "Normal"
-                  : "No data"}
+                {isConnected ? "ESP32 Connected" : "Not Connected"}
               </Text>
             </View>
           </View>

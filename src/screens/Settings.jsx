@@ -9,9 +9,11 @@ import {
 } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { AuthContext } from "../../AuthContext";
+import { WearableContext } from "../context/WearableContext";
 
 export default function Settings({ navigation }) {
   const { user, logout } = useContext(AuthContext);
+  const { isConnected, connectedDevice } = useContext(WearableContext);
 
   const userSupport = [
     { name: "Notifications", icon: "bell-outline" },
@@ -21,9 +23,7 @@ export default function Settings({ navigation }) {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={24} color="#111" />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
         <Text style={styles.headerTitle}>Settings</Text>
         <View style={{ width: 24 }} />
       </View>
@@ -62,6 +62,45 @@ export default function Settings({ navigation }) {
           ))}
         </View>
 
+        {/* Device Connection */}
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
+          Device
+        </Text>
+        <View style={styles.cardContainer}>
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => navigation.getParent()?.navigate("DeviceConnection")}
+          >
+            <View style={styles.cardLeft}>
+              <View
+                style={[
+                  styles.iconContainer,
+                  isConnected && { backgroundColor: "rgba(34,197,94,0.2)" },
+                ]}
+              >
+                <MaterialIcons
+                  name="wifi"
+                  size={24}
+                  color={isConnected ? "#22c55e" : "#13a4ec"}
+                />
+              </View>
+              <View>
+                <Text style={styles.cardText}>ESP32 Connection</Text>
+                <Text style={{ fontSize: 12, color: isConnected ? "#22c55e" : "#999", marginTop: 2 }}>
+                  {isConnected
+                    ? `Connected${connectedDevice?.name ? " — " + connectedDevice.name : ""}`
+                    : "Not connected"}
+                </Text>
+              </View>
+            </View>
+            <MaterialIcons
+              name="keyboard-arrow-right"
+              size={20}
+              color="#888"
+            />
+          </TouchableOpacity>
+        </View>
+
         {/* App Info */}
         <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
           App Info
@@ -69,7 +108,7 @@ export default function Settings({ navigation }) {
         <View style={styles.cardContainer}>
           <TouchableOpacity
             style={styles.card}
-            onPress={() => navigation.navigate("AppInfo")}
+            onPress={() => navigation.getParent()?.navigate("AppInfo")}
           >
             <View style={styles.cardLeft}>
               <View style={styles.iconContainer}>

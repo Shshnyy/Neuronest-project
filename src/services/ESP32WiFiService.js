@@ -121,33 +121,65 @@ class ESP32WiFiService {
         throw new Error('No response from device');
       }
     } catch (error) {
-      console.error('Connection error:', error);
+      console.error('Connection error:', error.message || error);
       this.isConnected = false;
+
+      // Provide user-friendly error messages
+      let errorMsg = error.message || 'Failed to connect to ESP32';
+      if (errorMsg.includes('Network Error') || errorMsg.includes('ECONNREFUSED')) {
+        errorMsg = 'Cannot reach ESP32. Ensure your phone and ESP32 are on the same WiFi network, and the IP address is correct.';
+      }
 
       return {
         success: false,
-        error: error.message || 'Failed to connect to ESP32',
+        error: errorMsg,
       };
     }
   }
 
   /**
    * Test connection to ESP32
+   * Tries multiple endpoints to be flexible with different ESP32 firmware
    */
   async testConnection() {
-    try {
-      const response = await axios.get(
-        `http://${this.deviceIP}:${this.devicePort}${API_BASE_PATH}/device-info`,
-        { timeout: 5000 }
-      );
+    const endpoints = [
+      `${API_BASE_PATH}/sensors`,
+      `${API_BASE_PATH}/device-info`,
+      `${API_BASE_PATH}/health`,
+      `/`,
+    ];
 
-      return response.data;
-    } catch (error) {
-      if (error.code === 'ECONNABORTED') {
-        throw new Error('Connection timeout - Check IP address and WiFi connection');
+    let lastError = null;
+
+    for (const endpoint of endpoints) {
+      try {
+        const url = `http://${this.deviceIP}:${this.devicePort}${endpoint}`;
+        console.log(`Testing connection: ${url}`);
+        const response = await axios.get(url, { timeout: 5000 });
+
+        // Any successful response means the device is reachable
+        console.log(`ESP32 reachable at ${endpoint}`);
+        return response.data || { name: `ESP32-${this.deviceIP}`, status: 'ok' };
+      } catch (error) {
+        lastError = error;
+        // If we got a response (even 404), the device IS reachable
+        if (error.response) {
+          console.log(`ESP32 reachable (got HTTP ${error.response.status} at ${endpoint})`);
+          return { name: `ESP32-${this.deviceIP}`, status: 'ok' };
+        }
+        // Otherwise try next endpoint
+        continue;
       }
-      throw error;
     }
+
+    // All endpoints failed — device is truly unreachable
+    if (lastError?.code === 'ECONNABORTED') {
+      throw new Error('Connection timeout — check IP address and that your phone is on the same WiFi as the ESP32');
+    }
+    if (lastError?.message?.includes('Network Error')) {
+      throw new Error('Network error — make sure your phone and ESP32 are on the same WiFi network');
+    }
+    throw new Error(lastError?.message || 'Cannot reach ESP32 — verify the IP address and WiFi network');
   }
 
   /**

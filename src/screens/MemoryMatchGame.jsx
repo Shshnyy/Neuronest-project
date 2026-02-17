@@ -5,7 +5,7 @@ const icons = ['❤️', '⭐', '☁️', '🐶', '❄️', '🌸'];
 const { width } = Dimensions.get('window');
 const CARD_SIZE = width / 4 - 20; // auto-adjust to screen width
 
-export default function MemoryMagicGame() {
+export default function MemoryMagicGame({ navigation }) {
   const [cards, setCards] = useState([]);
   const [flipped, setFlipped] = useState([]);
   const [matched, setMatched] = useState([]);

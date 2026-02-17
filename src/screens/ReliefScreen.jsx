@@ -8,7 +8,7 @@ export default function ReliefScreen({ navigation }) {
 
       <TouchableOpacity
         style={styles.option}
-        onPress={() => navigation.navigate('Music')}
+        onPress={() => navigation.getParent()?.navigate('Music')}
       >
         <Text style={styles.optionText}>🎵 Music</Text>
       </TouchableOpacity>
@@ -16,7 +16,7 @@ export default function ReliefScreen({ navigation }) {
       <TouchableOpacity
         style={styles.option}
         // ✅ Correct route name to match App.js
-        onPress={() => navigation.navigate('Games')}
+        onPress={() => navigation.getParent()?.navigate('Games')}
       >
         <Text style={styles.optionText}>🎮 Games</Text>
       </TouchableOpacity>

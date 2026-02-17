@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 
-export default function ReactionGame() {
+export default function ReactionGame({ navigation }) {
   const colors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308'];
   const colorNames = ['RED', 'BLUE', 'GREEN', 'YELLOW'];
   const [target, setTarget] = useState(0);

@@ -86,16 +86,7 @@ export default function HistoryScreen({ navigation }) {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.iconButton}
-          >
-            <MaterialIcons
-              name="arrow-back-ios"
-              size={24}
-              color={isDark ? "#fff" : "#111"}
-            />
-          </TouchableOpacity>
+          <View style={styles.iconButton} />
           <Text style={[styles.title, { color: isDark ? "#fff" : "#111" }]}>
             History
           </Text>
@@ -200,7 +191,7 @@ export default function HistoryScreen({ navigation }) {
         ]}
       >
         <TouchableOpacity
-          onPress={() => navigation.navigate("WeeklyHistory")}
+          onPress={() => navigation.getParent()?.navigate("WeeklyHistory")}
           style={[
             styles.weeklyButton,
             { backgroundColor: "#13a4ec30", borderColor: "#13a4ec" },

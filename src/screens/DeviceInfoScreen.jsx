@@ -149,13 +149,7 @@ export default function DeviceInfo({ navigation }) {
           },
         ]}
       >
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <MaterialIcons
-            name="arrow-back"
-            size={24}
-            color={isDark ? "#fff" : "#111"}
-          />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
         <Text style={[styles.headerTitle, { color: isDark ? "#fff" : "#111" }]}>
           Device Info
         </Text>

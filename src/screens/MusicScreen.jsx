@@ -21,10 +21,28 @@ const songs = [
   { id: 16, title: '🎻 Soulful Symphony', file: require('../../assets/soulful_symphony.mp3') },
 ];
 
-export default function MusicScreen() {
+export default function MusicScreen({ navigation }) {
   const [sound, setSound] = useState(null);
   const [playingId, setPlayingId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Configure audio mode on mount
+  useEffect(() => {
+    const configureAudio = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          staysActiveInBackground: true,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+      } catch (error) {
+        console.error('Error configuring audio:', error);
+      }
+    };
+    configureAudio();
+  }, []);
 
   async function stopSound() {
     if (sound) {
@@ -45,23 +63,36 @@ export default function MusicScreen() {
     setIsLoading(true);
 
     try {
+      // Stop any currently playing sound first
       if (sound) {
-        await stopSound();
+        try {
+          await sound.stopAsync();
+          await sound.unloadAsync();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        setSound(null);
+        setPlayingId(null);
       }
 
-      const { sound: newSound } = await Audio.Sound.createAsync(item.file);
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        item.file,
+        { shouldPlay: true, volume: 1.0 }
+      );
       setSound(newSound);
       setPlayingId(item.id);
 
-      await newSound.playAsync();
-
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.didJustFinish) {
-          stopSound();
+          newSound.unloadAsync();
+          setSound(null);
+          setPlayingId(null);
         }
       });
     } catch (e) {
       console.error('Error playing sound:', e);
+      setSound(null);
+      setPlayingId(null);
     } finally {
       setIsLoading(false);
     }
