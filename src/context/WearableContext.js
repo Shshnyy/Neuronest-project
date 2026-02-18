@@ -67,6 +67,7 @@ export const WearableProvider = ({ children }) => {
 
   // Refs
   const predictionIntervalRef = useRef(null);
+  const isModelReadyRef = useRef(false);
 
   // ==================== INITIALIZATION ====================
 
@@ -91,7 +92,9 @@ export const WearableProvider = ({ children }) => {
       const mlResult = await MLModelService.initialize();
       if (mlResult.success) {
         const loadResult = await MLModelService.loadModel();
-        setIsModelReady(loadResult.success || loadResult.usingFallback);
+        const ready = loadResult.success || loadResult.usingFallback;
+        setIsModelReady(ready);
+        isModelReadyRef.current = ready;
         if (!loadResult.success && !loadResult.usingFallback) {
           setModelError(loadResult.error);
         }
@@ -147,8 +150,8 @@ export const WearableProvider = ({ children }) => {
     // Save to storage
     await StorageService.saveSensorReading(data);
 
-    // Make prediction
-    if (isModelReady) {
+    // Make prediction (use ref to avoid stale closure)
+    if (isModelReadyRef.current) {
       const result = await MLModelService.predict(data);
       const calmScore = MLModelService.calculateCalmScore(result);
 
@@ -166,7 +169,7 @@ export const WearableProvider = ({ children }) => {
       // Save prediction
       await StorageService.savePrediction(fullPrediction);
     }
-  }, [isModelReady]);
+  }, []);
 
   const handleConnectionChange = useCallback((connected, device) => {
     setIsConnected(connected);

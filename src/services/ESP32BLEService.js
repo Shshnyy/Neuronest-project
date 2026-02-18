@@ -248,12 +248,16 @@ class ESP32BLEService {
     try {
       const decoded = Buffer.from(base64Value, 'base64').toString('utf-8');
       
+      // Default temperature to 36.5°C (body average) since ESP32 may not send it
+      const DEFAULT_TEMPERATURE = 36.5;
+
       // Try parsing as JSON first
       try {
         const data = JSON.parse(decoded);
+        const rawTemp = parseFloat(data.temperature || data.temp || 0);
         return {
           heartRate: parseFloat(data.heartRate || data.hr || 0),
-          temperature: parseFloat(data.temperature || data.temp || 0),
+          temperature: (rawTemp > 0) ? rawTemp : DEFAULT_TEMPERATURE,
           eda: parseFloat(data.eda || data.gsr || 0),
           timestamp: new Date().toISOString(),
           raw: data,
@@ -263,9 +267,10 @@ class ESP32BLEService {
         // Format: "heartRate,temperature,eda"
         const values = decoded.split(',').map((v) => parseFloat(v.trim()));
         if (values.length >= 3) {
+          const csvTemp = values[1];
           return {
             heartRate: values[0],
-            temperature: values[1],
+            temperature: (csvTemp > 0) ? csvTemp : DEFAULT_TEMPERATURE,
             eda: values[2],
             timestamp: new Date().toISOString(),
             raw: decoded,

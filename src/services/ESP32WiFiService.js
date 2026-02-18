@@ -245,9 +245,14 @@ class ESP32WiFiService {
    */
   parseSensorData(data) {
     try {
+      // Default temperature to 36.5°C (body average) since ESP32 may not send it
+      const DEFAULT_TEMPERATURE = 36.5;
+      const rawTemp = parseFloat(data.temperature || data.temp || 0);
+      const temperature = (rawTemp > 0 && rawTemp !== null) ? rawTemp : DEFAULT_TEMPERATURE;
+
       return {
         heartRate: parseFloat(data.heartRate || data.hr || 0),
-        temperature: parseFloat(data.temperature || data.temp || 0),
+        temperature,
         eda: parseFloat(data.eda || data.gsr || 0),
         timestamp: new Date().toISOString(),
         raw: data,

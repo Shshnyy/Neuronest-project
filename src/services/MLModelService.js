@@ -184,7 +184,13 @@ class MLModelService {
    */
   async predict(sensorData) {
     try {
-      const { heartRate, temperature, eda } = sensorData;
+      // Default temperature to body average if missing or zero (ESP32 may not send it)
+      const DEFAULT_TEMPERATURE = 36.5;
+      const heartRate = sensorData.heartRate;
+      const temperature = (typeof sensorData.temperature === 'number' && sensorData.temperature > 0)
+        ? sensorData.temperature
+        : DEFAULT_TEMPERATURE;
+      const eda = sensorData.eda;
 
       // Validate input
       if (
@@ -195,13 +201,16 @@ class MLModelService {
         throw new Error('Invalid sensor data format');
       }
 
+      // Use the sanitized values
+      const sanitizedData = { heartRate, temperature, eda };
+
       let prediction;
 
       // Use TensorFlow model if available, otherwise use rule-based
       if (this.model && this.useTensorFlow) {
-        prediction = await this.predictWithModel(sensorData);
+        prediction = await this.predictWithModel(sanitizedData);
       } else {
-        prediction = this.predictWithRules(sensorData);
+        prediction = this.predictWithRules(sanitizedData);
       }
 
       // Add to history for smoothing
@@ -216,7 +225,7 @@ class MLModelService {
       return {
         ...smoothedPrediction,
         raw: prediction,
-        sensorData,
+        sensorData: sanitizedData,
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
