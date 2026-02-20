@@ -96,6 +96,15 @@ const getStressThresholds = () => {
 
 const STRESS_THRESHOLDS = getStressThresholds();
 
+// Helper: get current thresholds (re-evaluates from config if available)
+const getCurrentThresholds = () => {
+  try {
+    return getStressThresholds();
+  } catch {
+    return STRESS_THRESHOLDS;
+  }
+};
+
 class MLModelService {
   constructor() {
     this.model = null;
@@ -192,13 +201,24 @@ class MLModelService {
         : DEFAULT_TEMPERATURE;
       const eda = sensorData.eda;
 
-      // Validate input
+      // Validate input types
       if (
         typeof heartRate !== 'number' ||
         typeof temperature !== 'number' ||
         typeof eda !== 'number'
       ) {
         throw new Error('Invalid sensor data format');
+      }
+
+      // Reject if heart rate is invalid (no finger on sensor)
+      // Physiological range: 40-200 bpm
+      if (heartRate < 40 || heartRate > 200) {
+        return {
+          state: MIND_STATES.UNKNOWN,
+          confidence: 0,
+          error: 'No valid heart rate — ensure finger is on the sensor',
+          fingerDetected: false,
+        };
       }
 
       // Use the sanitized values
@@ -273,6 +293,7 @@ class MLModelService {
    */
   predictWithRules(sensorData) {
     const { heartRate, temperature, eda } = sensorData;
+    const thresholds = getCurrentThresholds();
 
     // Calculate feature deviations from baseline
     const hrDeviation = (heartRate - NORMALIZATION_PARAMS.heartRate.mean) / 
@@ -284,14 +305,14 @@ class MLModelService {
 
     // Stress indicators based on thresholds
     const indicators = {
-      hrElevated: heartRate >= STRESS_THRESHOLDS.heartRate.elevated,
-      hrHigh: heartRate >= STRESS_THRESHOLDS.heartRate.high,
-      hrCritical: heartRate >= STRESS_THRESHOLDS.heartRate.critical,
-      tempElevated: temperature >= STRESS_THRESHOLDS.temperature.elevated,
-      tempHigh: temperature >= STRESS_THRESHOLDS.temperature.high,
-      edaElevated: eda >= STRESS_THRESHOLDS.eda.elevated,
-      edaHigh: eda >= STRESS_THRESHOLDS.eda.high,
-      edaCritical: eda >= STRESS_THRESHOLDS.eda.critical,
+      hrElevated: heartRate >= thresholds.heartRate.elevated,
+      hrHigh: heartRate >= thresholds.heartRate.high,
+      hrCritical: heartRate >= thresholds.heartRate.critical,
+      tempElevated: temperature >= thresholds.temperature.elevated,
+      tempHigh: temperature >= thresholds.temperature.high,
+      edaElevated: eda >= thresholds.eda.elevated,
+      edaHigh: eda >= thresholds.eda.high,
+      edaCritical: eda >= thresholds.eda.critical,
     };
 
     // Calculate stress score using weighted combination
@@ -335,8 +356,9 @@ class MLModelService {
       state = MIND_STATES.STRESSED;
       confidence = 0.55 + stressScore * 0.3;
     } else if (stressScore >= 0.15) {
-      // Borderline - could be either
-      if (Math.random() < 0.3) {
+      // Borderline zone - use deterministic threshold instead of random
+      // Lean towards CALM unless stress score is closer to the upper bound
+      if (stressScore >= 0.27) {
         state = MIND_STATES.STRESSED;
         confidence = 0.50 + stressScore;
       } else {

@@ -20,6 +20,16 @@ import ConfigManager from '../utils/ConfigManager';
 const DEFAULT_PORT = 80;
 const API_BASE_PATH = '/api';
 
+// Minimum IR value to consider a finger present (MAX30102/MAX30100 standard)
+const IR_THRESHOLD = 50000;
+// Smoothing window size for HR readings
+const HR_SMOOTHING_WINDOW = 6;
+// Valid resting HR range to display (clamp output to this)
+const HR_DISPLAY_MIN = 60;
+const HR_DISPLAY_MAX = 100;
+// Spike rejection: ignore raw readings that jump more than this from the running average
+const HR_MAX_JUMP = 25;
+
 class ESP32WiFiService {
   constructor() {
     this.deviceIP = null;
@@ -35,6 +45,9 @@ class ESP32WiFiService {
     this.consecutiveFailures = 0;
     this.maxConsecutiveFailures = 5;
     this.deviceInfo = null;
+    // Smoothing buffers
+    this.hrBuffer = [];
+    this.edaBuffer = [];
   }
 
   /**
@@ -245,15 +258,91 @@ class ESP32WiFiService {
    */
   parseSensorData(data) {
     try {
+      // Log raw ESP32 data for debugging
+      console.log('[ESP32 Raw Data]', JSON.stringify(data));
+
       // Default temperature to 36.5°C (body average) since ESP32 may not send it
       const DEFAULT_TEMPERATURE = 36.5;
       const rawTemp = parseFloat(data.temperature || data.temp || 0);
       const temperature = (rawTemp > 0 && rawTemp !== null) ? rawTemp : DEFAULT_TEMPERATURE;
 
+      const rawHR = parseFloat(data.heartRate || data.hr || 0);
+      const rawEDA = parseFloat(data.eda || data.gsr || 0);
+
+      // === Finger Detection ===
+      let fingerDetected = false;
+
+      // 1. Explicit flag from ESP32
+      if (data.fingerDetected !== undefined || data.finger !== undefined) {
+        fingerDetected = !!(data.fingerDetected ?? data.finger);
+      }
+      // 2. IR value check
+      else if (data.irValue !== undefined || data.rawIR !== undefined || data.ir !== undefined) {
+        const irValue = parseFloat(data.irValue || data.rawIR || data.ir || 0);
+        fingerDetected = irValue > IR_THRESHOLD;
+      }
+      // 3. Fallback: HR in physiological range = finger present
+      else {
+        fingerDetected = rawHR >= 40 && rawHR <= 200;
+      }
+
+      // === Heart Rate Smoothing ===
+      let smoothedHR = 0;
+      if (fingerDetected) {
+        // Spike rejection: discard readings that jump too far from running average
+        if (this.hrBuffer.length >= 2) {
+          const currentAvg = this.hrBuffer.reduce((a, b) => a + b, 0) / this.hrBuffer.length;
+          if (Math.abs(rawHR - currentAvg) > HR_MAX_JUMP) {
+            // Reject spike — use previous average instead
+            console.log(`[HR Smoothing] Spike rejected: raw=${rawHR.toFixed(1)}, avg=${currentAvg.toFixed(1)}`);
+          } else {
+            this.hrBuffer.push(rawHR);
+          }
+        } else {
+          this.hrBuffer.push(rawHR);
+        }
+
+        // Keep buffer at window size
+        if (this.hrBuffer.length > HR_SMOOTHING_WINDOW) {
+          this.hrBuffer.shift();
+        }
+
+        // Weighted moving average (recent readings weighted more)
+        if (this.hrBuffer.length > 0) {
+          let weightSum = 0;
+          let valueSum = 0;
+          this.hrBuffer.forEach((v, i) => {
+            const weight = i + 1; // newer = higher weight
+            valueSum += v * weight;
+            weightSum += weight;
+          });
+          smoothedHR = valueSum / weightSum;
+        }
+
+        // Clamp to normal resting range for a clean display
+        smoothedHR = Math.round(Math.max(HR_DISPLAY_MIN, Math.min(HR_DISPLAY_MAX, smoothedHR)));
+        console.log(`[HR Smoothing] raw=${rawHR.toFixed(1)}, smoothed=${smoothedHR}, buffer=[${this.hrBuffer.map(v => v.toFixed(0)).join(',')}]`);
+      } else {
+        // No finger — reset buffer
+        this.hrBuffer = [];
+      }
+
+      // === EDA Smoothing ===
+      let smoothedEDA = rawEDA;
+      if (rawEDA > 0) {
+        this.edaBuffer.push(rawEDA);
+        if (this.edaBuffer.length > HR_SMOOTHING_WINDOW) {
+          this.edaBuffer.shift();
+        }
+        smoothedEDA = this.edaBuffer.reduce((a, b) => a + b, 0) / this.edaBuffer.length;
+        smoothedEDA = parseFloat(smoothedEDA.toFixed(2));
+      }
+
       return {
-        heartRate: parseFloat(data.heartRate || data.hr || 0),
+        heartRate: smoothedHR,
+        fingerDetected,
         temperature,
-        eda: parseFloat(data.eda || data.gsr || 0),
+        eda: smoothedEDA,
         timestamp: new Date().toISOString(),
         raw: data,
       };

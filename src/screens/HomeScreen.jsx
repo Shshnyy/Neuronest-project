@@ -71,17 +71,20 @@ export default function HomeScreen({ navigation }) {
     )
     .join(" ");
 
-  // Format sensor values
-  const heartRateDisplay = sensorData.heartRate
+  // Format sensor values — only show HR when finger is actually on the sensor
+  const fingerDetected = sensorData.fingerDetected === true;
+  const heartRateDisplay = fingerDetected
     ? `${Math.round(sensorData.heartRate)} bpm`
     : "--";
   
-  const heartRateStatus = sensorData.heartRate
+  const heartRateStatus = fingerDetected
     ? sensorData.heartRate < 60
       ? "Low"
       : sensorData.heartRate > 100
       ? "Elevated"
       : "Normal"
+    : isConnected
+    ? "Place finger on sensor"
     : "No data";
 
   const calmScoreDisplay = prediction.calmScore || "--";

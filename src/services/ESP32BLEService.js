@@ -251,12 +251,31 @@ class ESP32BLEService {
       // Default temperature to 36.5°C (body average) since ESP32 may not send it
       const DEFAULT_TEMPERATURE = 36.5;
 
+      // Helper: determine finger detection from data fields
+      const detectFinger = (rawData, rawHR) => {
+        // 1. Explicit flag from ESP32
+        if (rawData.fingerDetected !== undefined || rawData.finger !== undefined) {
+          return !!(rawData.fingerDetected ?? rawData.finger);
+        }
+        // 2. IR value check (MAX30102: > 50000 = finger present)
+        if (rawData.irValue !== undefined || rawData.rawIR !== undefined || rawData.ir !== undefined) {
+          const irValue = parseFloat(rawData.irValue || rawData.rawIR || rawData.ir || 0);
+          return irValue > 50000;
+        }
+        // 3. Fallback: HR range check only
+        return rawHR >= 40 && rawHR <= 200;
+      };
+
       // Try parsing as JSON first
       try {
         const data = JSON.parse(decoded);
         const rawTemp = parseFloat(data.temperature || data.temp || 0);
+        const rawHR = parseFloat(data.heartRate || data.hr || 0);
+        const fingerDetected = detectFinger(data, rawHR);
+        const heartRate = fingerDetected ? rawHR : 0;
         return {
-          heartRate: parseFloat(data.heartRate || data.hr || 0),
+          heartRate,
+          fingerDetected,
           temperature: (rawTemp > 0) ? rawTemp : DEFAULT_TEMPERATURE,
           eda: parseFloat(data.eda || data.gsr || 0),
           timestamp: new Date().toISOString(),
@@ -268,8 +287,12 @@ class ESP32BLEService {
         const values = decoded.split(',').map((v) => parseFloat(v.trim()));
         if (values.length >= 3) {
           const csvTemp = values[1];
+          const csvHR = values[0];
+          const fingerDetected = csvHR >= 40 && csvHR <= 200;
+          const heartRate = fingerDetected ? csvHR : 0;
           return {
-            heartRate: values[0],
+            heartRate,
+            fingerDetected,
             temperature: (csvTemp > 0) ? csvTemp : DEFAULT_TEMPERATURE,
             eda: values[2],
             timestamp: new Date().toISOString(),

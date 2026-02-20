@@ -141,6 +141,13 @@ export const WearableProvider = ({ children }) => {
   // ==================== BLE HANDLERS ====================
 
   const handleSensorData = useCallback(async (data) => {
+    console.log('[WearableContext] Sensor data received:', {
+      heartRate: data.heartRate,
+      fingerDetected: data.fingerDetected,
+      eda: data.eda,
+      temperature: data.temperature,
+    });
+
     // Update current sensor data
     setSensorData(data);
 
@@ -150,9 +157,19 @@ export const WearableProvider = ({ children }) => {
     // Save to storage
     await StorageService.saveSensorReading(data);
 
+    // Only run prediction if finger is on sensor (valid heart rate)
+    if (!data.fingerDetected) {
+      console.log('[WearableContext] No finger detected — skipping prediction');
+      // Reset prediction to unknown when no finger detected
+      setPrediction(DEFAULT_PREDICTION);
+      return;
+    }
+
     // Make prediction (use ref to avoid stale closure)
+    console.log('[WearableContext] Running prediction, modelReady:', isModelReadyRef.current);
     if (isModelReadyRef.current) {
       const result = await MLModelService.predict(data);
+      console.log('[WearableContext] Prediction result:', result.state, 'confidence:', result.confidence);
       const calmScore = MLModelService.calculateCalmScore(result);
 
       const fullPrediction = {
@@ -257,14 +274,14 @@ export const WearableProvider = ({ children }) => {
 
   const refreshDeviceInfo = async () => {
     try {
-      const info = await ESP32BLEService.readDeviceInfo();
+      const info = await ESP32WiFiService.readDeviceInfo();
       if (info) {
         setDeviceInfo((prev) => ({
           ...prev,
           ...info,
           lastSync: new Date().toISOString(),
         }));
-        await StorageService.sWiFiDeviceInfo(info);
+        await StorageService.saveDeviceInfo(info);
       }
     } catch (error) {
       console.error('Error refreshing device info:', error);
@@ -314,6 +331,7 @@ export const WearableProvider = ({ children }) => {
       // Generate mock sensor data
       const mockData = {
         heartRate: 60 + Math.random() * 40, // 60-100 bpm
+        fingerDetected: true, // Mock always assumes finger is on sensor
         temperature: 36 + Math.random() * 1.5, // 36-37.5°C
         eda: 0.5 + Math.random() * 5, // 0.5-5.5 microsiemens
         timestamp: new Date().toISOString(),
