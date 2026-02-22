@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext } from "react";
 import {
   View,
   Text,
@@ -6,10 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   useColorScheme,
-  ActivityIndicator,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { Svg, Polyline, Circle } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WearableContext, MIND_STATES } from "../context/WearableContext";
 
@@ -17,66 +15,22 @@ export default function HomeScreen({ navigation }) {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
 
-  // Get data from WearableContext
   const {
     isConnected,
     sensorData,
     prediction,
-    getWeeklyStressData,
     getStateInfo,
     isModelReady,
   } = useContext(WearableContext);
 
-  // Local state for weekly data
-  const [weeklyData, setWeeklyData] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Load weekly stress data
-  useEffect(() => {
-    loadWeeklyData();
-  }, []);
-
-  const loadWeeklyData = async () => {
-    try {
-      const data = await getWeeklyStressData();
-      if (data && data.length > 0) {
-        setWeeklyData(data.map((d) => d.count));
-      } else {
-        setWeeklyData([0, 0, 0, 0, 0, 0, 0]);
-      }
-    } catch (error) {
-      console.error("Error loading weekly data:", error);
-      setWeeklyData([0, 0, 0, 0, 0, 0, 0]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Get state info based on prediction
   const stateInfo = getStateInfo(prediction.state);
 
-  // Calculate graph points
-  const graphWidth = 300;
-  const graphHeight = 100;
-  const lineData = weeklyData.length > 0 ? weeklyData : [0, 0, 0, 0, 0, 0, 0];
-  const maxY = Math.max(...lineData, 1);
-
-  const points = lineData
-    .map(
-      (val, i) =>
-        `${(i * (graphWidth / (lineData.length - 1))).toFixed(2)},${(
-          graphHeight -
-          (val / maxY) * graphHeight
-        ).toFixed(2)}`
-    )
-    .join(" ");
-
-  // Format sensor values — only show HR when finger is actually on the sensor
   const fingerDetected = sensorData.fingerDetected === true;
+
   const heartRateDisplay = fingerDetected
     ? `${Math.round(sensorData.heartRate)} bpm`
     : "--";
-  
+
   const heartRateStatus = fingerDetected
     ? sensorData.heartRate < 60
       ? "Low"
@@ -88,6 +42,7 @@ export default function HomeScreen({ navigation }) {
     : "No data";
 
   const calmScoreDisplay = prediction.calmScore || "--";
+
   const calmScoreStatus = prediction.calmScore
     ? prediction.calmScore >= 80
       ? "Excellent"
@@ -99,6 +54,15 @@ export default function HomeScreen({ navigation }) {
     : "No data";
 
   const connectionColor = isConnected ? "#22c55e" : "#ef4444";
+
+  // Motion Sense
+  const motionDetected = sensorData.motion === true;
+
+  const motionDisplay = isConnected
+    ? motionDetected
+      ? "Detected"
+      : "Not Detected"
+    : "--";
 
   return (
     <SafeAreaView
@@ -113,15 +77,11 @@ export default function HomeScreen({ navigation }) {
           ]}
         >
           <MaterialIcons name="menu" size={32} color={isDark ? "#fff" : "#111"} />
-          <Text
-            style={[styles.headerTitle, { color: isDark ? "#fff" : "#111" }]}
-          >
+          <Text style={[styles.headerTitle, { color: isDark ? "#fff" : "#111" }]}>
             Dashboard
           </Text>
-          {/* Connection Status Indicator */}
-          <View
-            style={styles.connectionIndicator}
-          >
+
+          <View style={styles.connectionIndicator}>
             <View
               style={[
                 styles.connectionDot,
@@ -134,90 +94,52 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Current State Card */}
-        <View
-          style={[
-            styles.stateCard,
-            { backgroundColor: isDark ? "#1c1c1c" : "#fff" },
-          ]}
-        >
-          <View
-            style={[
-              styles.stateIconCircle,
-              { backgroundColor: `${stateInfo.color}20` },
-            ]}
-          >
-            <MaterialIcons
-              name={stateInfo.icon}
-              size={48}
-              color={stateInfo.color}
-            />
-          </View>
-          <Text style={[styles.stateTitle, { color: stateInfo.color }]}>
-            {prediction.state}
-          </Text>
-          <Text
-            style={[
-              styles.stateDesc,
-              { color: isDark ? "#a0b3bd" : "#617c89" },
-            ]}
-          >
-            {stateInfo.description}
-          </Text>
-          {prediction.confidence > 0 && (
-            <Text
-              style={[
-                styles.confidenceText,
-                { color: isDark ? "#a0b3bd" : "#617c89" },
-              ]}
-            >
-              Confidence: {Math.round(prediction.confidence * 100)}%
-            </Text>
-          )}
-          {!isConnected && (
-            <TouchableOpacity
-              style={styles.connectButton}
-              onPress={() => navigation.navigate("DeviceConnection")}
-            >
-              <Text style={styles.connectButtonText}>Connect Device</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+{/* Current State */}
+<TouchableOpacity
+  activeOpacity={0.8}
+  onPress={() => navigation.navigate("DeviceConnection")}
+  style={[
+    styles.stateCard,
+    { backgroundColor: isDark ? "#1c1c1c" : "#fff" },
+  ]}
+>
+  <View
+    style={[
+      styles.stateIconCircle,
+      { backgroundColor: `${stateInfo.color}20` },
+    ]}
+  >
+    <MaterialIcons
+      name={stateInfo.icon}
+      size={48}
+      color={stateInfo.color}
+    />
+  </View>
 
-        {/* Recommendation Banner */}
-        {prediction.state !== MIND_STATES.UNKNOWN && prediction.state !== MIND_STATES.CALM && (
-          <View
-            style={[
-              styles.recommendationBanner,
-              {
-                backgroundColor:
-                  prediction.state === MIND_STATES.MELTDOWN
-                    ? "#fef2f2"
-                    : "#fffbeb",
-                borderColor:
-                  prediction.state === MIND_STATES.MELTDOWN
-                    ? "#ef4444"
-                    : "#f59e0b",
-              },
-            ]}
-          >
-            <MaterialIcons
-              name="lightbulb"
-              size={20}
-              color={
-                prediction.state === MIND_STATES.MELTDOWN
-                  ? "#ef4444"
-                  : "#f59e0b"
-              }
-            />
-            <Text style={styles.recommendationText}>
-              {stateInfo.recommendation}
-            </Text>
-            <TouchableOpacity onPress={() => navigation.navigate("Relief")}>
-              <Text style={styles.reliefLink}>Try Relief →</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+  <Text style={[styles.stateTitle, { color: stateInfo.color }]}>
+    {prediction.state}
+  </Text>
+
+  <Text
+    style={[
+      styles.stateDesc,
+      { color: isDark ? "#a0b3bd" : "#617c89" },
+    ]}
+  >
+    {stateInfo.description}
+  </Text>
+
+  {prediction.confidence > 0 && (
+    <Text
+      style={[
+        styles.confidenceText,
+        { color: isDark ? "#a0b3bd" : "#617c89" },
+      ]}
+    >
+      Confidence: {Math.round(prediction.confidence * 100)}%
+    </Text>
+  )}
+</TouchableOpacity>
 
         {/* Real-time Monitoring */}
         <Text
@@ -226,56 +148,78 @@ export default function HomeScreen({ navigation }) {
           Real-time Monitoring
         </Text>
 
+        {/* Row 1 */}
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          {/* Heart Rate Card */}
+          {/* Heart Rate */}
           <View
             style={[
               styles.card,
-              {
-                backgroundColor: isDark ? "#1c1c1c" : "#fff",
-                width: "48%",
-              },
+              { backgroundColor: isDark ? "#1c1c1c" : "#fff", width: "48%" },
             ]}
           >
             <View style={[styles.iconCircle, { backgroundColor: "#ef444420" }]}>
               <MaterialIcons name="favorite" size={24} color="#ef4444" />
             </View>
             <View>
-              <Text
-                style={[
-                  styles.cardLabel,
-                  { color: isDark ? "#a0b3bd" : "#617c89" },
-                ]}
-              >
-                Heart Rate
-              </Text>
-              <Text
-                style={[
-                  styles.cardValue,
-                  { color: isDark ? "#fff" : "#111" },
-                ]}
-              >
-                {heartRateDisplay}
-              </Text>
-              <Text
-                style={[
-                  styles.cardLabel,
-                  { color: isDark ? "#a0b3bd" : "#617c89" },
-                ]}
-              >
-                {heartRateStatus}
-              </Text>
+              <Text style={styles.cardLabel}>Heart Rate</Text>
+              <Text style={styles.cardValue}>{heartRateDisplay}</Text>
+              <Text style={styles.cardLabel}>{heartRateStatus}</Text>
             </View>
           </View>
 
-          {/* Calm Score Card */}
+          {/* EDA */}
           <View
             style={[
               styles.card,
-              {
-                backgroundColor: isDark ? "#1c1c1c" : "#fff",
-                width: "48%",
-              },
+              { backgroundColor: isDark ? "#1c1c1c" : "#fff", width: "48%" },
+            ]}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: "#8b5cf620" }]}>
+              <MaterialIcons name="electric-bolt" size={24} color="#8b5cf6" />
+            </View>
+            <View>
+              <Text style={styles.cardLabel}>EDA/GSR</Text>
+              <Text style={styles.cardValue}>
+                {sensorData.eda ? `${sensorData.eda.toFixed(2)} μS` : "--"}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Motion */}
+        <View style={{ marginTop: 16 }}>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: isDark ? "#1c1c1c" : "#fff" },
+            ]}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: "#3b82f620" }]}>
+              <MaterialIcons
+                name="directions-run"
+                size={24}
+                color="#3b82f6"
+              />
+            </View>
+            <View>
+              <Text style={styles.cardLabel}>Motion Sense</Text>
+              <Text style={styles.cardValue}>{motionDisplay}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Row 2 */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginTop: 24,
+          }}
+        >
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: isDark ? "#1c1c1c" : "#fff", width: "48%" },
             ]}
           >
             <View style={[styles.iconCircle, { backgroundColor: "#22c55e20" }]}>
@@ -286,224 +230,43 @@ export default function HomeScreen({ navigation }) {
               />
             </View>
             <View>
-              <Text
-                style={[
-                  styles.cardLabel,
-                  { color: isDark ? "#a0b3bd" : "#617c89" },
-                ]}
-              >
-                Calm Score
-              </Text>
-              <Text
-                style={[
-                  styles.cardValue,
-                  { color: isDark ? "#fff" : "#111" },
-                ]}
-              >
-                {calmScoreDisplay}
-              </Text>
-              <Text
-                style={[
-                  styles.cardLabel,
-                  { color: isDark ? "#a0b3bd" : "#617c89" },
-                ]}
-              >
-                {calmScoreStatus}
-              </Text>
+              <Text style={styles.cardLabel}>Calm Score</Text>
+              <Text style={styles.cardValue}>{calmScoreDisplay}</Text>
             </View>
           </View>
-        </View>
 
-        {/* Additional Sensor Cards */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            marginTop: 8,
-          }}
-        >
-          {/* WiFi Status Card */}
           <View
             style={[
               styles.card,
-              {
-                backgroundColor: isDark ? "#1c1c1c" : "#fff",
-                width: "48%",
-              },
+              { backgroundColor: isDark ? "#1c1c1c" : "#fff", width: "48%" },
             ]}
           >
-            <View style={[styles.iconCircle, { backgroundColor: isConnected ? "#22c55e20" : "#ef444420" }]}>
-              <MaterialIcons name="wifi" size={24} color={isConnected ? "#22c55e" : "#ef4444"} />
+            <View
+              style={[
+                styles.iconCircle,
+                { backgroundColor: isConnected ? "#22c55e20" : "#ef444420" },
+              ]}
+            >
+              <MaterialIcons
+                name="wifi"
+                size={24}
+                color={isConnected ? "#22c55e" : "#ef4444"}
+              />
             </View>
             <View>
-              <Text
-                style={[
-                  styles.cardLabel,
-                  { color: isDark ? "#a0b3bd" : "#617c89" },
-                ]}
-              >
-                WiFi Status
-              </Text>
-              <Text
-                style={[
-                  styles.cardValue,
-                  { color: isDark ? "#fff" : "#111" },
-                ]}
-              >
+              <Text style={styles.cardLabel}>WiFi Status</Text>
+              <Text style={styles.cardValue}>
                 {isConnected ? "Online" : "Offline"}
               </Text>
-              <Text
-                style={[
-                  styles.cardLabel,
-                  { color: isConnected ? "#22c55e" : "#ef4444" },
-                ]}
-              >
-                {isConnected ? "ESP32 Connected" : "Not Connected"}
-              </Text>
-            </View>
-          </View>
-
-          {/* EDA Card */}
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: isDark ? "#1c1c1c" : "#fff",
-                width: "48%",
-              },
-            ]}
-          >
-            <View style={[styles.iconCircle, { backgroundColor: "#8b5cf620" }]}>
-              <MaterialIcons name="electric-bolt" size={24} color="#8b5cf6" />
-            </View>
-            <View>
-              <Text
-                style={[
-                  styles.cardLabel,
-                  { color: isDark ? "#a0b3bd" : "#617c89" },
-                ]}
-              >
-                EDA/GSR
-              </Text>
-              <Text
-                style={[
-                  styles.cardValue,
-                  { color: isDark ? "#fff" : "#111" },
-                ]}
-              >
-                {sensorData.eda ? `${sensorData.eda.toFixed(2)} μS` : "--"}
-              </Text>
-              <Text
-                style={[
-                  styles.cardLabel,
-                  { color: isDark ? "#a0b3bd" : "#617c89" },
-                ]}
-              >
-                {sensorData.eda
-                  ? sensorData.eda > 4
-                    ? "Elevated"
-                    : "Normal"
-                  : "No data"}
-              </Text>
             </View>
           </View>
         </View>
-
-        {/* Stress Episode Trends */}
-        <Text
-          style={[styles.sectionTitle, { color: isDark ? "#fff" : "#111" }]}
-        >
-          Stress Episode Trends
-        </Text>
-
-        <View style={styles.trendTabs}>
-          <TouchableOpacity style={styles.trendButtonActive}>
-            <Text style={styles.trendButtonTextActive}>Weekly</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Line Graph */}
-        <View
-          style={{
-            marginTop: 16,
-            backgroundColor: isDark ? "#1c1c1c" : "#fff",
-            padding: 12,
-            borderRadius: 16,
-          }}
-        >
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#13a4ec" />
-              <Text
-                style={{ color: isDark ? "#a0b3bd" : "#617c89", marginTop: 8 }}
-              >
-                Loading data...
-              </Text>
-            </View>
-          ) : (
-            <>
-              <Svg width={graphWidth} height={graphHeight}>
-                <Polyline
-                  points={points}
-                  fill="none"
-                  stroke="#13a4ec"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-                {/* Data points */}
-                {lineData.map((val, i) => (
-                  <Circle
-                    key={i}
-                    cx={(i * (graphWidth / (lineData.length - 1))).toFixed(2)}
-                    cy={(
-                      graphHeight -
-                      (val / maxY) * graphHeight
-                    ).toFixed(2)}
-                    r="4"
-                    fill="#13a4ec"
-                  />
-                ))}
-              </Svg>
-
-              {/* Weekday labels */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  marginTop: 4,
-                }}
-              >
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
-                  (day, idx) => (
-                    <Text
-                      key={idx}
-                      style={{
-                        fontSize: 10,
-                        color: isDark ? "#a0b3bd" : "#617c89",
-                      }}
-                    >
-                      {day}
-                    </Text>
-                  )
-                )}
-              </View>
-            </>
-          )}
-        </View>
-
-        {/* Model Status */}
-        {!isModelReady && (
-          <View style={styles.modelStatusBanner}>
-            <MaterialIcons name="info" size={16} color="#3b82f6" />
-            <Text style={styles.modelStatusText}>
-              Using rule-based predictions. Add ML model for better accuracy.
-            </Text>
-          </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+/* -------------------- STYLES -------------------- */
 
 const styles = StyleSheet.create({
   header: {
@@ -513,11 +276,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingBottom: 8,
   },
-  headerTitle: { fontSize: 18, fontWeight: "bold" },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
   connectionIndicator: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 4,
   },
   connectionDot: {
     width: 8,
@@ -525,7 +290,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginRight: 4,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "bold", marginVertical: 12 },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginVertical: 12,
+  },
   card: {
     flexDirection: "row",
     padding: 16,
@@ -533,13 +302,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   iconCircle: {
-    backgroundColor: "#13a4ec20",
     padding: 12,
     borderRadius: 50,
     marginRight: 12,
   },
-  cardLabel: { fontSize: 12 },
-  cardValue: { fontSize: 18, fontWeight: "bold" },
+  cardLabel: {
+    fontSize: 12,
+    color: "#617c89",
+  },
+  cardValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
   stateCard: {
     padding: 16,
     borderRadius: 16,
@@ -551,66 +325,17 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     marginBottom: 8,
   },
-  stateTitle: { fontSize: 20, fontWeight: "bold" },
-  stateDesc: { fontSize: 14, textAlign: "center", marginTop: 4 },
-  confidenceText: { fontSize: 12, marginTop: 4 },
-  connectButton: {
-    backgroundColor: "#13a4ec",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginTop: 12,
-  },
-  connectButtonText: { color: "#fff", fontWeight: "bold" },
-  recommendationBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 8,
-    flexWrap: "wrap",
-  },
-  recommendationText: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 13,
-    color: "#374151",
-  },
-  reliefLink: {
-    color: "#13a4ec",
+  stateTitle: {
+    fontSize: 20,
     fontWeight: "bold",
-    fontSize: 13,
   },
-  trendTabs: {
-    backgroundColor: "#e5e7eb40",
-    borderRadius: 100,
-    paddingVertical: 6,
-    alignItems: "center",
+  stateDesc: {
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 4,
   },
-  trendButtonActive: {
-    backgroundColor: "#13a4ec",
-    paddingHorizontal: 24,
-    paddingVertical: 8,
-    borderRadius: 100,
-  },
-  trendButtonTextActive: { color: "#fff", fontWeight: "bold", fontSize: 12 },
-  loadingContainer: {
-    height: 100,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modelStatusBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    backgroundColor: "#eff6ff",
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  modelStatusText: {
-    marginLeft: 8,
+  confidenceText: {
     fontSize: 12,
-    color: "#3b82f6",
+    marginTop: 4,
   },
 });

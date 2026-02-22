@@ -21,6 +21,8 @@ const DEFAULT_SENSOR_DATA = {
   heartRate: 0,
   temperature: 0,
   eda: 0,
+  motion: false,   // 👈 ADD THIS
+  fingerDetected: false, // good to keep consistent
   timestamp: null,
 };
 
@@ -330,12 +332,13 @@ export const WearableProvider = ({ children }) => {
     predictionIntervalRef.current = setInterval(async () => {
       // Generate mock sensor data
       const mockData = {
-        heartRate: 60 + Math.random() * 40, // 60-100 bpm
-        fingerDetected: true, // Mock always assumes finger is on sensor
-        temperature: 36 + Math.random() * 1.5, // 36-37.5°C
-        eda: 0.5 + Math.random() * 5, // 0.5-5.5 microsiemens
-        timestamp: new Date().toISOString(),
-      };
+  heartRate: 60 + Math.random() * 40,
+  fingerDetected: true,
+  temperature: 36 + Math.random() * 1.5,
+  eda: 0.5 + Math.random() * 5,
+  motion: Math.random() > 0.7,  // 👈 random motion detection
+  timestamp: new Date().toISOString(),
+};
 
       // Simulate occasional stress
       if (Math.random() < 0.1) {
