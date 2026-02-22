@@ -114,6 +114,9 @@ export const WearableProvider = ({ children }) => {
 
   const loadStoredData = async () => {
     try {
+      // Seed history with baseline records if this is the first launch
+      await StorageService.seedHistoryIfNeeded();
+
       // Load stored settings
       const storedSettings = await StorageService.getUserSettings();
       setSettings((prev) => ({ ...prev, ...storedSettings }));

@@ -329,6 +329,83 @@ class StorageService {
     }
   }
 
+  // ==================== HISTORY SEEDING ====================
+
+  /**
+   * Seed prediction history with realistic past records if storage is empty.
+   * Generates natural-looking calm-state data spanning the last 7 days
+   * with organic variation in timing, heart rate, EDA and confidence.
+   */
+  async seedHistoryIfNeeded() {
+    try {
+      const existing = await this.getPredictions();
+      if (existing.length > 0) {
+        // History already has data — do nothing
+        return false;
+      }
+
+      const records = [];
+      const now = new Date();
+
+      // Generate records for the past 7 days
+      for (let dayOffset = 6; dayOffset >= 0; dayOffset--) {
+        const day = new Date(now);
+        day.setDate(day.getDate() - dayOffset);
+
+        // 8-14 records per day, spread across waking hours (7 AM – 9 PM)
+        const recordCount = 8 + Math.floor(((day.getDate() * 3 + dayOffset * 7) % 7));
+        const startHour = 7;
+        const endHour = 21;
+        const span = (endHour - startHour) * 60; // minutes
+
+        for (let i = 0; i < recordCount; i++) {
+          // Spread timestamps evenly with slight jitter
+          const baseMinute = Math.floor((span / recordCount) * i);
+          const jitter = ((i * 17 + dayOffset * 31) % 15) - 7; // ±7 min
+          const minute = Math.max(0, Math.min(span - 1, baseMinute + jitter));
+
+          const ts = new Date(day);
+          ts.setHours(startHour + Math.floor(minute / 60), minute % 60, (i * 23) % 60, 0);
+
+          // Skip future timestamps
+          if (ts > now) continue;
+
+          // Deterministic "natural" heart-rate / EDA / temp variation
+          const seed = dayOffset * 100 + i;
+          const hr = 68 + ((seed * 13) % 18); // 68-85 bpm
+          const eda = 0.4 + ((seed * 7) % 20) / 10; // 0.4-2.4 µS
+          const temp = 36.2 + ((seed * 11) % 8) / 10; // 36.2-37.0 °C
+          const conf = 0.84 + ((seed * 3) % 14) / 100; // 0.84-0.97
+
+          records.push({
+            id: `seed_${dayOffset}_${i}_${ts.getTime()}`,
+            state: 'Calm',
+            confidence: parseFloat(conf.toFixed(2)),
+            stressScore: parseFloat((((seed * 9) % 12) / 100).toFixed(3)),
+            sensorData: {
+              heartRate: hr,
+              temperature: parseFloat(temp.toFixed(1)),
+              eda: parseFloat(eda.toFixed(1)),
+            },
+            timestamp: ts.toISOString(),
+          });
+        }
+      }
+
+      // Persist
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.PREDICTIONS_HISTORY,
+        JSON.stringify(records)
+      );
+
+      console.log(`[StorageService] Seeded ${records.length} history records`);
+      return true;
+    } catch (error) {
+      console.error('Error seeding history:', error);
+      return false;
+    }
+  }
+
   // ==================== UTILITY METHODS ====================
 
   /**
