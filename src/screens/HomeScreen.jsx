@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { WearableContext, MIND_STATES } from "../context/WearableContext";
+import { WearableContext } from "../context/WearableContext";
 
 export default function HomeScreen({ navigation }) {
   const scheme = useColorScheme();
@@ -20,12 +20,11 @@ export default function HomeScreen({ navigation }) {
     sensorData,
     prediction,
     getStateInfo,
-    isModelReady,
   } = useContext(WearableContext);
 
   const stateInfo = getStateInfo(prediction.state);
 
-  const fingerDetected = sensorData.fingerDetected === true;
+  const fingerDetected = sensorData?.fingerDetected === true;
 
   const heartRateDisplay = fingerDetected
     ? `${Math.round(sensorData.heartRate)} bpm`
@@ -42,29 +41,20 @@ export default function HomeScreen({ navigation }) {
     : "No data";
 
   const calmScoreDisplay = prediction.calmScore || "--";
-
-  const calmScoreStatus = prediction.calmScore
-    ? prediction.calmScore >= 80
-      ? "Excellent"
-      : prediction.calmScore >= 60
-      ? "Good"
-      : prediction.calmScore >= 40
-      ? "Moderate"
-      : "Low"
-    : "No data";
-
   const connectionColor = isConnected ? "#22c55e" : "#ef4444";
 
-  // Motion Sense — classified as NONE, LOW, HIGH
+  /* ---------------- MOTION LOGIC ---------------- */
+
   let motionDisplay = "--";
   let motionColor = "#6b7280";
   let motionIcon = "accessibility";
+
   if (isConnected) {
-    if (sensorData.motion === "HIGH") {
+    if (sensorData?.motion === "HIGH") {
       motionDisplay = "HIGH MOTION DETECTED";
       motionColor = "#ef4444";
       motionIcon = "run-circle";
-    } else if (sensorData.motion === "LOW") {
+    } else if (sensorData?.motion === "LOW") {
       motionDisplay = "LOW MOTION DETECTED";
       motionColor = "#f59e42";
       motionIcon = "directions-run";
@@ -80,6 +70,7 @@ export default function HomeScreen({ navigation }) {
       style={{ flex: 1, backgroundColor: isDark ? "#101c22" : "#f6f7f8" }}
     >
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+
         {/* Header */}
         <View
           style={[
@@ -105,52 +96,41 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-{/* Current State */}
-<TouchableOpacity
-  activeOpacity={0.8}
-  onPress={() => navigation.navigate("DeviceConnection")}
-  style={[
-    styles.stateCard,
-    { backgroundColor: isDark ? "#1c1c1c" : "#fff" },
-  ]}
->
-  <View
-    style={[
-      styles.stateIconCircle,
-      { backgroundColor: `${stateInfo.color}20` },
-    ]}
-  >
-    <MaterialIcons
-      name={stateInfo.icon}
-      size={48}
-      color={stateInfo.color}
-    />
-  </View>
+        {/* Current State */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate("DeviceConnection")}
+          style={[
+            styles.stateCard,
+            { backgroundColor: isDark ? "#1c1c1c" : "#fff" },
+          ]}
+        >
+          <View
+            style={[
+              styles.stateIconCircle,
+              { backgroundColor: `${stateInfo.color}20` },
+            ]}
+          >
+            <MaterialIcons
+              name={stateInfo.icon}
+              size={48}
+              color={stateInfo.color}
+            />
+          </View>
 
-  <Text style={[styles.stateTitle, { color: stateInfo.color }]}>
-    {prediction.state}
-  </Text>
+          <Text style={[styles.stateTitle, { color: stateInfo.color }]}>
+            {prediction.state}
+          </Text>
 
-  <Text
-    style={[
-      styles.stateDesc,
-      { color: isDark ? "#a0b3bd" : "#617c89" },
-    ]}
-  >
-    {stateInfo.description}
-  </Text>
-
-  {prediction.confidence > 0 && (
-    <Text
-      style={[
-        styles.confidenceText,
-        { color: isDark ? "#a0b3bd" : "#617c89" },
-      ]}
-    >
-      Confidence: {Math.round(prediction.confidence * 100)}%
-    </Text>
-  )}
-</TouchableOpacity>
+          <Text
+            style={[
+              styles.stateDesc,
+              { color: isDark ? "#a0b3bd" : "#617c89" },
+            ]}
+          >
+            {stateInfo.description}
+          </Text>
+        </TouchableOpacity>
 
         {/* Real-time Monitoring */}
         <Text
@@ -161,6 +141,7 @@ export default function HomeScreen({ navigation }) {
 
         {/* Row 1 */}
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+
           {/* Heart Rate */}
           <View
             style={[
@@ -189,9 +170,9 @@ export default function HomeScreen({ navigation }) {
               <MaterialIcons name="electric-bolt" size={24} color="#8b5cf6" />
             </View>
             <View>
-              <Text style={styles.cardLabel}>EDA/GSR</Text>
+              <Text style={styles.cardLabel}>EDA / ADC</Text>
               <Text style={styles.cardValue}>
-                {sensorData.eda ? `${sensorData.eda.toFixed(2)} μS` : "--"}
+                {sensorData?.eda ?? "--"}
               </Text>
             </View>
           </View>
@@ -207,14 +188,16 @@ export default function HomeScreen({ navigation }) {
           >
             <View style={[styles.iconCircle, { backgroundColor: `${motionColor}20` }]}>
               <MaterialIcons
-                name={motionDetected ? "directions-run" : "accessibility"}
+                name={motionIcon}
                 size={24}
                 color={motionColor}
               />
             </View>
             <View>
               <Text style={styles.cardLabel}>Motion Sense</Text>
-              <Text style={[styles.cardValue, { color: motionColor }]}>{motionDisplay}</Text>
+              <Text style={[styles.cardValue, { color: motionColor }]}>
+                {motionDisplay}
+              </Text>
             </View>
           </View>
         </View>
@@ -234,11 +217,7 @@ export default function HomeScreen({ navigation }) {
             ]}
           >
             <View style={[styles.iconCircle, { backgroundColor: "#22c55e20" }]}>
-              <MaterialIcons
-                name="sentiment-very-satisfied"
-                size={24}
-                color="#22c55e"
-              />
+              <MaterialIcons name="sentiment-very-satisfied" size={24} color="#22c55e" />
             </View>
             <View>
               <Text style={styles.cardLabel}>Calm Score</Text>
@@ -272,12 +251,13 @@ export default function HomeScreen({ navigation }) {
             </View>
           </View>
         </View>
+
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-/* -------------------- STYLES -------------------- */
+/* ---------------- STYLES ---------------- */
 
 const styles = StyleSheet.create({
   header: {
@@ -287,66 +267,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingBottom: 8,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  connectionIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  headerTitle: { fontSize: 18, fontWeight: "bold" },
+  connectionIndicator: { flexDirection: "row", alignItems: "center" },
   connectionDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     marginRight: 4,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginVertical: 12,
-  },
-  card: {
-    flexDirection: "row",
-    padding: 16,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-  iconCircle: {
-    padding: 12,
-    borderRadius: 50,
-    marginRight: 12,
-  },
-  cardLabel: {
-    fontSize: 12,
-    color: "#617c89",
-  },
-  cardValue: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  stateCard: {
-    padding: 16,
-    borderRadius: 16,
-    marginVertical: 12,
-    alignItems: "center",
-  },
-  stateIconCircle: {
-    padding: 8,
-    borderRadius: 100,
-    marginBottom: 8,
-  },
-  stateTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  stateDesc: {
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 4,
-  },
-  confidenceText: {
-    fontSize: 12,
-    marginTop: 4,
-  },
+  sectionTitle: { fontSize: 16, fontWeight: "bold", marginVertical: 12 },
+  card: { flexDirection: "row", padding: 16, borderRadius: 16, alignItems: "center" },
+  iconCircle: { padding: 12, borderRadius: 50, marginRight: 12 },
+  cardLabel: { fontSize: 12, color: "#617c89" },
+  cardValue: { fontSize: 18, fontWeight: "bold" },
+  stateCard: { padding: 16, borderRadius: 16, marginVertical: 12, alignItems: "center" },
+  stateIconCircle: { padding: 8, borderRadius: 100, marginBottom: 8 },
+  stateTitle: { fontSize: 20, fontWeight: "bold" },
+  stateDesc: { fontSize: 14, textAlign: "center", marginTop: 4 },
 });

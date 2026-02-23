@@ -293,94 +293,39 @@ class MLModelService {
    * @param {Object} sensorData 
    */
   predictWithRules(sensorData) {
-    const { heartRate, temperature, eda } = sensorData;
+  const { heartRate, temperature, eda } = sensorData;
 
-    // Calculate feature deviations from baseline
-    const hrDeviation = (heartRate - NORMALIZATION_PARAMS.heartRate.mean) / 
-                        NORMALIZATION_PARAMS.heartRate.std;
-    const tempDeviation = (temperature - NORMALIZATION_PARAMS.temperature.mean) / 
-                          NORMALIZATION_PARAMS.temperature.std;
-    const edaDeviation = (eda - NORMALIZATION_PARAMS.eda.mean) / 
-                         NORMALIZATION_PARAMS.eda.std;
+  let state;
+  let confidence = 0.9;
 
-    // Physiological threshold indicators
-    // Calibrated against WESAD baseline distributions — only extreme values trigger stress
-    const indicators = {
-      hrElevated: heartRate >= 120,
-      hrHigh: heartRate >= 140,
-      hrCritical: heartRate >= 160,
-      tempElevated: temperature >= 38.0,
-      tempHigh: temperature >= 38.8,
-      edaElevated: eda >= 8.0,
-      edaHigh: eda >= 12.0,
-      edaCritical: eda >= 18.0,
-    };
-
-    // Weighted stress accumulator (WESAD feature-importance weights)
-    let stressScore = 0;
-    
-    // Heart rate contribution (40% weight)
-    if (indicators.hrCritical) stressScore += 0.40;
-    else if (indicators.hrHigh) stressScore += 0.28;
-    else if (indicators.hrElevated) stressScore += 0.10;
-    
-    // EDA contribution (40% weight)
-    if (indicators.edaCritical) stressScore += 0.40;
-    else if (indicators.edaHigh) stressScore += 0.24;
-    else if (indicators.edaElevated) stressScore += 0.08;
-    
-    // Temperature contribution (20% weight)
-    if (indicators.tempHigh) stressScore += 0.20;
-    else if (indicators.tempElevated) stressScore += 0.06;
-
-    // Deviation-based micro-adjustment for statistical outliers
-    const combinedDeviation = (hrDeviation * 0.4 + edaDeviation * 0.4 + tempDeviation * 0.2);
-    if (combinedDeviation > 3.5) stressScore += 0.08;
-    if (combinedDeviation > 5.0) stressScore += 0.08;
-
-    // Natural micro-variation seeded from sensor values (deterministic, not random)
-    const microNoise = ((heartRate * 7 + eda * 13) % 100) / 10000; // ±0.01
-
-    // State classification
-    let state;
-    let confidence;
-
-    if (stressScore >= 0.72) {
-      // Meltdown: requires simultaneous extreme HR + EDA
-      if ((indicators.hrCritical || indicators.hrHigh) && 
-          (indicators.edaCritical || indicators.edaHigh)) {
-        state = MIND_STATES.MELTDOWN;
-        confidence = Math.min(0.95, 0.78 + stressScore * 0.15);
-      } else {
-        state = MIND_STATES.STRESSED;
-        confidence = 0.68 + stressScore * 0.12;
-      }
-    } else if (stressScore >= 0.50) {
-      state = MIND_STATES.STRESSED;
-      confidence = 0.58 + stressScore * 0.25;
-    } else {
-      // Calm state — covers the vast majority of normal readings
-      state = MIND_STATES.CALM;
-      // Confidence varies naturally with how far below the stress boundary we are
-      const calmMargin = 0.50 - stressScore; // 0..0.50
-      confidence = 0.82 + calmMargin * 0.30 + microNoise;
-    }
-
-    // Clamp confidence to realistic range
-    confidence = Math.min(0.98, Math.max(0.40, confidence));
-
-    return {
-      state,
-      confidence,
-      stressScore,
-      indicators,
-      deviations: {
-        heartRate: hrDeviation,
-        temperature: tempDeviation,
-        eda: edaDeviation,
-      },
-    };
+  // Your ADC mapping
+  if (eda >= 2300 && eda <= 2500) {
+    state = MIND_STATES.UNKNOWN; // No finger
+    confidence = 0.5;
   }
+  else if (eda >= 1900 && eda <= 2100) {
+    state = MIND_STATES.CALM;
+  }
+  else if (eda >= 1700 && eda < 1900) {
+    state = MIND_STATES.STRESSED; // Mild stress
+  }
+  else if (eda >= 1500 && eda < 1700) {
+    state = MIND_STATES.STRESSED; // High stress
+    confidence = 0.92;
+  }
+  else if (eda >= 1300 && eda < 1500) {
+    state = MIND_STATES.MELTDOWN; // Extreme stress
+    confidence = 0.95;
+  }
+  else {
+    state = MIND_STATES.CALM; // fallback
+  }
+
+  return {
+    state,
+    confidence,
+  };
+}
 
   /**
    * Map model output class to mind state
