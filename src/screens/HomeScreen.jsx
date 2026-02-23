@@ -51,11 +51,11 @@ export default function HomeScreen({ navigation }) {
 
   if (isConnected) {
     if (sensorData?.motion === "HIGH") {
-      motionDisplay = "HIGH MOTION DETECTED";
+      motionDisplay = "MOTION DETECTED";
       motionColor = "#ef4444";
       motionIcon = "run-circle";
     } else if (sensorData?.motion === "LOW") {
-      motionDisplay = "LOW MOTION DETECTED";
+      motionDisplay = "REST";
       motionColor = "#f59e42";
       motionIcon = "directions-run";
     } else {
@@ -172,7 +172,7 @@ export default function HomeScreen({ navigation }) {
             <View>
               <Text style={styles.cardLabel}>EDA / ADC</Text>
               <Text style={styles.cardValue}>
-                {sensorData?.eda ?? "--"}
+                {sensorData?.eda > 2400 ? "No Finger" : sensorData?.eda ?? "--"}
               </Text>
             </View>
           </View>
@@ -284,4 +284,22 @@ const styles = StyleSheet.create({
   stateIconCircle: { padding: 8, borderRadius: 100, marginBottom: 8 },
   stateTitle: { fontSize: 20, fontWeight: "bold" },
   stateDesc: { fontSize: 14, textAlign: "center", marginTop: 4 },
+  fingerBox: {
+    backgroundColor: '#ef444420',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 2,
+    maxWidth: 120,
+    alignSelf: 'center',
+  },
+  fingerBoxText: {
+    color: '#ef4444',
+    fontWeight: 'bold',
+    fontSize: 14,
+    textAlign: 'center',
+    flexWrap: 'wrap',
+  },
 });

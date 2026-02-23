@@ -490,9 +490,11 @@ export default function DeviceInfo({ navigation }) {
                 },
               ]}
             >
-              {sensorData.eda >= 0
-                ? `${sensorData.eda.toFixed(2)} µS`
-                : "No Data"}
+              {sensorData.eda > 2400
+                ? "No Finger Detected"
+                : sensorData.eda >= 0
+                  ? `${sensorData.eda.toFixed(2)} µS`
+                  : "No Data"}
             </Text>
           </View>
         </View>
