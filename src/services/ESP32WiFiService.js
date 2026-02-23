@@ -37,7 +37,10 @@ const HR_MAX_JUMP = 25;
 // signals motion.
 const ACCEL_MOTION_THRESHOLD = 1.15;   // g-units (magnitude)
 const ACCEL_REST_GRAVITY     = 1.0;    // expected magnitude at rest
-const GYRO_MOTION_THRESHOLD  = 30;     // degrees/s
+const ACCEL_LOW_MOTION_THRESHOLD = 1.08; // g-units (magnitude) for low motion
+const ACCEL_HIGH_MOTION_THRESHOLD = 1.25; // g-units (magnitude) for high motion
+const GYRO_LOW_MOTION_THRESHOLD = 20;     // degrees/s for low motion
+const GYRO_HIGH_MOTION_THRESHOLD = 60;    // degrees/s for high motion
 
 class ESP32WiFiService {
   constructor() {
@@ -368,13 +371,25 @@ class ESP32WiFiService {
           }
           this.prevAccelMag = accelMag;
 
-          motionDetected = deviation > (ACCEL_MOTION_THRESHOLD - ACCEL_REST_GRAVITY) || jerk > 0.12;
+          if (deviation > (ACCEL_HIGH_MOTION_THRESHOLD - ACCEL_REST_GRAVITY) || jerk > 0.25) {
+            motionDetected = "HIGH";
+          } else if (deviation > (ACCEL_LOW_MOTION_THRESHOLD - ACCEL_REST_GRAVITY) || jerk > 0.08) {
+            motionDetected = "LOW";
+          } else {
+            motionDetected = "NONE";
+          }
           console.log(`[Motion] accelMag=${accelMag.toFixed(3)}, deviation=${deviation.toFixed(3)}, jerk=${jerk.toFixed(3)}, detected=${motionDetected}`);
         }
 
         if (hasGyro && !motionDetected) {
           const gyroMag = Math.sqrt(gx * gx + gy * gy + gz * gz);
-          motionDetected = gyroMag > GYRO_MOTION_THRESHOLD;
+          if (gyroMag > GYRO_HIGH_MOTION_THRESHOLD) {
+            motionDetected = "HIGH";
+          } else if (gyroMag > GYRO_LOW_MOTION_THRESHOLD) {
+            motionDetected = "LOW";
+          } else {
+            motionDetected = "NONE";
+          }
           console.log(`[Motion] gyroMag=${gyroMag.toFixed(2)}, detected=${motionDetected}`);
         }
       }
@@ -395,7 +410,7 @@ class ESP32WiFiService {
         fingerDetected,
         temperature,
         eda: smoothedEDA,
-        motion: motionDetected,
+        motion: motionDetected, // "NONE", "LOW", "HIGH"
         timestamp: new Date().toISOString(),
         raw: data,
       };

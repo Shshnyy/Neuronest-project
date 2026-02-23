@@ -55,16 +55,25 @@ export default function HomeScreen({ navigation }) {
 
   const connectionColor = isConnected ? "#22c55e" : "#ef4444";
 
-  // Motion Sense — derived from accelerometer / gyroscope data
-  const motionDetected = sensorData.motion === true;
-
-  const motionDisplay = isConnected
-    ? motionDetected
-      ? "Detected"
-      : "Still"
-    : "--";
-
-  const motionColor = motionDetected ? "#3b82f6" : "#6b7280";
+  // Motion Sense — classified as NONE, LOW, HIGH
+  let motionDisplay = "--";
+  let motionColor = "#6b7280";
+  let motionIcon = "accessibility";
+  if (isConnected) {
+    if (sensorData.motion === "HIGH") {
+      motionDisplay = "HIGH MOTION DETECTED";
+      motionColor = "#ef4444";
+      motionIcon = "run-circle";
+    } else if (sensorData.motion === "LOW") {
+      motionDisplay = "LOW MOTION DETECTED";
+      motionColor = "#f59e42";
+      motionIcon = "directions-run";
+    } else {
+      motionDisplay = "No Motion";
+      motionColor = "#3b82f6";
+      motionIcon = "accessibility";
+    }
+  }
 
   return (
     <SafeAreaView
