@@ -151,6 +151,7 @@ export const WearableProvider = ({ children }) => {
       fingerDetected: data.fingerDetected,
       eda: data.eda,
       temperature: data.temperature,
+      motion: data.motion,
     });
 
     // Update current sensor data

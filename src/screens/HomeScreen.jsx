@@ -55,14 +55,16 @@ export default function HomeScreen({ navigation }) {
 
   const connectionColor = isConnected ? "#22c55e" : "#ef4444";
 
-  // Motion Sense
+  // Motion Sense — derived from accelerometer / gyroscope data
   const motionDetected = sensorData.motion === true;
 
   const motionDisplay = isConnected
     ? motionDetected
       ? "Detected"
-      : "Not Detected"
+      : "Still"
     : "--";
+
+  const motionColor = motionDetected ? "#3b82f6" : "#6b7280";
 
   return (
     <SafeAreaView
@@ -194,16 +196,16 @@ export default function HomeScreen({ navigation }) {
               { backgroundColor: isDark ? "#1c1c1c" : "#fff" },
             ]}
           >
-            <View style={[styles.iconCircle, { backgroundColor: "#3b82f620" }]}>
+            <View style={[styles.iconCircle, { backgroundColor: `${motionColor}20` }]}>
               <MaterialIcons
-                name="directions-run"
+                name={motionDetected ? "directions-run" : "accessibility"}
                 size={24}
-                color="#3b82f6"
+                color={motionColor}
               />
             </View>
             <View>
               <Text style={styles.cardLabel}>Motion Sense</Text>
-              <Text style={styles.cardValue}>{motionDisplay}</Text>
+              <Text style={[styles.cardValue, { color: motionColor }]}>{motionDisplay}</Text>
             </View>
           </View>
         </View>

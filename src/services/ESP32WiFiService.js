@@ -30,6 +30,15 @@ const HR_DISPLAY_MAX = 100;
 // Spike rejection: ignore raw readings that jump more than this from the running average
 const HR_MAX_JUMP = 25;
 
+// Motion detection thresholds
+// Acceleration magnitude threshold (values above this indicate movement)
+// At rest the accelerometer reads ~1 g (9.8 m/s²).  A reading that deviates
+// significantly from 1 g in magnitude, or any notable gyroscope activity,
+// signals motion.
+const ACCEL_MOTION_THRESHOLD = 1.15;   // g-units (magnitude)
+const ACCEL_REST_GRAVITY     = 1.0;    // expected magnitude at rest
+const GYRO_MOTION_THRESHOLD  = 30;     // degrees/s
+
 class ESP32WiFiService {
   constructor() {
     this.deviceIP = null;
@@ -48,6 +57,8 @@ class ESP32WiFiService {
     // Smoothing buffers
     this.hrBuffer = [];
     this.edaBuffer = [];
+    // Motion detection state
+    this.prevAccelMag = null;
   }
 
   /**
@@ -327,6 +338,47 @@ class ESP32WiFiService {
         this.hrBuffer = [];
       }
 
+      // === Motion Detection ===
+      let motionDetected = false;
+
+      // 1. Explicit motion flag from ESP32
+      if (data.motion !== undefined || data.motionDetected !== undefined) {
+        motionDetected = !!(data.motion ?? data.motionDetected);
+      }
+      // 2. Derive from accelerometer data
+      else {
+        const ax = parseFloat(data.accelX ?? data.ax ?? data.accX ?? 0);
+        const ay = parseFloat(data.accelY ?? data.ay ?? data.accY ?? 0);
+        const az = parseFloat(data.accelZ ?? data.az ?? data.accZ ?? 0);
+        const hasAccel = (data.accelX !== undefined || data.ax !== undefined || data.accX !== undefined);
+
+        const gx = parseFloat(data.gyroX ?? data.gx ?? 0);
+        const gy = parseFloat(data.gyroY ?? data.gy ?? 0);
+        const gz = parseFloat(data.gyroZ ?? data.gz ?? 0);
+        const hasGyro = (data.gyroX !== undefined || data.gx !== undefined);
+
+        if (hasAccel) {
+          const accelMag = Math.sqrt(ax * ax + ay * ay + az * az);
+          // Check if magnitude deviates from resting gravity
+          const deviation = Math.abs(accelMag - ACCEL_REST_GRAVITY);
+          // Also check jerk (change between consecutive readings)
+          let jerk = 0;
+          if (this.prevAccelMag !== null) {
+            jerk = Math.abs(accelMag - this.prevAccelMag);
+          }
+          this.prevAccelMag = accelMag;
+
+          motionDetected = deviation > (ACCEL_MOTION_THRESHOLD - ACCEL_REST_GRAVITY) || jerk > 0.12;
+          console.log(`[Motion] accelMag=${accelMag.toFixed(3)}, deviation=${deviation.toFixed(3)}, jerk=${jerk.toFixed(3)}, detected=${motionDetected}`);
+        }
+
+        if (hasGyro && !motionDetected) {
+          const gyroMag = Math.sqrt(gx * gx + gy * gy + gz * gz);
+          motionDetected = gyroMag > GYRO_MOTION_THRESHOLD;
+          console.log(`[Motion] gyroMag=${gyroMag.toFixed(2)}, detected=${motionDetected}`);
+        }
+      }
+
       // === EDA Smoothing ===
       let smoothedEDA = rawEDA;
       if (rawEDA > 0) {
@@ -343,6 +395,7 @@ class ESP32WiFiService {
         fingerDetected,
         temperature,
         eda: smoothedEDA,
+        motion: motionDetected,
         timestamp: new Date().toISOString(),
         raw: data,
       };
