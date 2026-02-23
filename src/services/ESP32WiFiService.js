@@ -341,15 +341,16 @@ class ESP32WiFiService {
         this.hrBuffer = [];
       }
 
-      // === Motion Detection ===
-      let motionDetected = false;
+      // === Motion Detection Classification ===
+      let motionLevel = "NONE";
 
-      // 1. Explicit motion flag from ESP32
-      if (data.motion !== undefined || data.motionDetected !== undefined) {
-        motionDetected = !!(data.motion ?? data.motionDetected);
-      }
-      // 2. Derive from accelerometer data
-      else {
+      // 1. Explicit motion level from ESP32
+      if (typeof data.motion === "string") {
+        motionLevel = data.motion.toUpperCase();
+      } else if (data.motionLevel !== undefined) {
+        motionLevel = String(data.motionLevel).toUpperCase();
+      } else {
+        // 2. Derive from accelerometer/gyroscope data
         const ax = parseFloat(data.accelX ?? data.ax ?? data.accX ?? 0);
         const ay = parseFloat(data.accelY ?? data.ay ?? data.accY ?? 0);
         const az = parseFloat(data.accelZ ?? data.az ?? data.accZ ?? 0);
@@ -360,11 +361,12 @@ class ESP32WiFiService {
         const gz = parseFloat(data.gyroZ ?? data.gz ?? 0);
         const hasGyro = (data.gyroX !== undefined || data.gx !== undefined);
 
+        let accelLevel = "NONE";
+        let gyroLevel = "NONE";
+
         if (hasAccel) {
           const accelMag = Math.sqrt(ax * ax + ay * ay + az * az);
-          // Check if magnitude deviates from resting gravity
           const deviation = Math.abs(accelMag - ACCEL_REST_GRAVITY);
-          // Also check jerk (change between consecutive readings)
           let jerk = 0;
           if (this.prevAccelMag !== null) {
             jerk = Math.abs(accelMag - this.prevAccelMag);
@@ -372,25 +374,32 @@ class ESP32WiFiService {
           this.prevAccelMag = accelMag;
 
           if (deviation > (ACCEL_HIGH_MOTION_THRESHOLD - ACCEL_REST_GRAVITY) || jerk > 0.25) {
-            motionDetected = "HIGH";
+            accelLevel = "HIGH";
           } else if (deviation > (ACCEL_LOW_MOTION_THRESHOLD - ACCEL_REST_GRAVITY) || jerk > 0.08) {
-            motionDetected = "LOW";
-          } else {
-            motionDetected = "NONE";
+            accelLevel = "LOW";
           }
-          console.log(`[Motion] accelMag=${accelMag.toFixed(3)}, deviation=${deviation.toFixed(3)}, jerk=${jerk.toFixed(3)}, detected=${motionDetected}`);
+          // else remains NONE
+          console.log(`[Motion] accelMag=${accelMag.toFixed(3)}, deviation=${deviation.toFixed(3)}, jerk=${jerk.toFixed(3)}, accelLevel=${accelLevel}`);
         }
 
-        if (hasGyro && !motionDetected) {
+        if (hasGyro) {
           const gyroMag = Math.sqrt(gx * gx + gy * gy + gz * gz);
           if (gyroMag > GYRO_HIGH_MOTION_THRESHOLD) {
-            motionDetected = "HIGH";
+            gyroLevel = "HIGH";
           } else if (gyroMag > GYRO_LOW_MOTION_THRESHOLD) {
-            motionDetected = "LOW";
-          } else {
-            motionDetected = "NONE";
+            gyroLevel = "LOW";
           }
-          console.log(`[Motion] gyroMag=${gyroMag.toFixed(2)}, detected=${motionDetected}`);
+          // else remains NONE
+          console.log(`[Motion] gyroMag=${gyroMag.toFixed(2)}, gyroLevel=${gyroLevel}`);
+        }
+
+        // Combine accel/gyro levels (HIGH wins, else LOW, else NONE)
+        if (accelLevel === "HIGH" || gyroLevel === "HIGH") {
+          motionLevel = "HIGH";
+        } else if (accelLevel === "LOW" || gyroLevel === "LOW") {
+          motionLevel = "LOW";
+        } else {
+          motionLevel = "NONE";
         }
       }
 
@@ -410,7 +419,7 @@ class ESP32WiFiService {
         fingerDetected,
         temperature,
         eda: smoothedEDA,
-        motion: motionDetected, // "NONE", "LOW", "HIGH"
+        motion: motionLevel, // "NONE", "LOW", "HIGH"
         timestamp: new Date().toISOString(),
         raw: data,
       };
